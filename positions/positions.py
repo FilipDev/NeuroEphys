@@ -77,7 +77,11 @@ class PositionMatrix:
             prior = [datum[1], datum[2]]
         print("Finished reading positions from file", self.position_matrix_file)
 
-    def compute_speed_distribution(self):
+    # TODO: Implement
+    def find_velocities(self):
+        pass
+
+    def find_speed_distribution(self):
         """
         Calculates the speed distribution of the data
         :return: The speed distribution
@@ -137,7 +141,7 @@ class PositionMatrix:
         self.angular_velocities = angle_changes
         return self.angular_velocities
 
-    def compute_rotational_velocity(self):
+    def find_rotational_velocity(self):
         """
         Calculates the rotational velocity timeseries of the path, the rate of change of the arc tangents
         :return: The rotational velocity

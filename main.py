@@ -33,7 +33,7 @@ if __name__ == '__main__':
         position_matrix.plot()
 
     # Compute rotational velocities
-    rotational_velocities = position_matrix.compute_rotational_velocity()
+    rotational_velocities = position_matrix.find_rotational_velocity()
 
     # TODO: Figure out if by second is too long, if so, may need to reduce to 100ms
     # Create a dataframe to find the average rotational velocity in each second
