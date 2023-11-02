@@ -5,6 +5,7 @@ import numpy as np
 
 import analysis.analyzer as analyzer
 import spikes.reader as reader
+import plot.plotter as plotter
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
@@ -13,6 +14,7 @@ if __name__ == '__main__':
             "cell vs cell": True,
             "single cell": False
             }
+    debug = True
 
     # Select and read all T files
     t_files = glob.glob('../../data/t_files/*.t')
@@ -24,8 +26,8 @@ if __name__ == '__main__':
     print("Decompressing and smoothing")
     decompressed_t_files = [analyzer.decompress_timestamp_data(read_t_files[i][1], significant_digits) for i in range(len(read_t_files))]
     smoothed_t_files = [analyzer.apply_kernel(
-        decompressed_t_files[i], 10**significant_digits, window_size=100, step_size=10,
-        kernel_type="gaussian", sigma=100
+        decompressed_t_files[i], 10**significant_digits, window_size=5000, step_size=10,
+        kernel_type="gaussian", sigma=5000
     ) for i in range(len(decompressed_t_files))]
     print("Done")
 
@@ -37,26 +39,22 @@ if __name__ == '__main__':
             plt.hist(smoothed_t_files[i] / np.std(smoothed_t_files[i]), bins=100, range=(1,20))
             plt.show()
 
-    # Plot cell vs cell scatterplots
+    # Plot cell vs cell heatmaps
     if plot["cell vs cell"]:
-        print("Plotting cell vs cell scatterplots")
+        print("Plotting cell vs cell heatmaps")
         for i in range(len(smoothed_t_files)):
             for j in range(len(smoothed_t_files)):
-                if not (i == 9 and j == 7):
+                if not (i == 11 and j == 1) and not (i == 6 and j == 7):  # Here I select two cell pairs to plot
                     continue
-                if i == j:
+                if i == j:  # Don't plot cell against itself
                     continue
-                plt.title("Cell {} vs Cell {}, firing rate per second".format(i, j))
-                # Creating a 2D histogram
-                heatmap, xedges, yedges = np.histogram2d(smoothed_t_files[i], smoothed_t_files[j], bins=50)
-                extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
-                heatmap[0, 0] = 0
-                heatmap = np.arctan(heatmap / np.std(heatmap))
+                plotter.plot_cell_vs_cell(smoothed_t_files[i], smoothed_t_files[j], i, j)
 
-                # Plotting the heatmap
-                plt.clf()
-                plt.imshow(heatmap.T, extent=extent, origin='lower', cmap='hot')
-                plt.title("Cell {} vs Cell {}, firing rate per second".format(i, j))
-                plt.xlabel("Cell {}".format(i))
-                plt.ylabel("Cell {}".format(j))
-                plt.show()
+    if debug:
+        # Real time debugging
+        while True:
+            command = input("Please enter your next command: \n")
+            try:
+                exec(command)
+            except Exception as e:
+                print(e)
