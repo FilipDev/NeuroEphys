@@ -1,5 +1,6 @@
 import numpy as np
 import math
+import scipy.signal as signal
 
 from numpy import ndarray
 
@@ -28,7 +29,7 @@ def decompress_timestamp_data(timestamps: np.ndarray, precision: int):
 
 
 def apply_kernel(binary_data: np.ndarray, steps_per_second: float, window_size: float, step_size: float,
-                 **kwargs):
+                 fft=True, **kwargs):
     """
     Applies a kernel on the inputted binary data, used for density calculations
     :param binary_data: The binary input data to apply the kernel on
@@ -50,23 +51,13 @@ def apply_kernel(binary_data: np.ndarray, steps_per_second: float, window_size: 
     # Makes the step size proportional to the precision of the data in significant digits
     step_size *= steps_per_second
 
-    # Makes an array with as many indices as there are step sizes that fit in it
-    kerneled_values = np.zeros(round(len(binary_data) / step_size))
-    for i in range(0, len(binary_data), int(step_size)):
-        sum_of_values = 0
-        passes = 0
-        for j in range(int(i - window_size / 2), int(i + window_size / 2)):
-            if j < 0 or j >= len(binary_data):
-                passes += 1
-                pass
-            else:
-                i_in_seconds, j_in_seconds = i / steps_per_second, j / steps_per_second
-                sum_of_values += kernels.get_factor(kernel, center=i_in_seconds, x=j_in_seconds,
-                                                    window_size=window_size_in_seconds, **kwargs) * binary_data[j]
-        kerneled_values[round(i / step_size)] = sum_of_values / (window_size - passes)
+    convolved = signal.fftconvolve(binary_data, [kernel(window_size/2, i, window_size=window_size, **kwargs) for i in range(int(window_size))], mode='same')
 
-    return kerneled_values
+    #convolved = np.convolve(binary_data, [kernel(window_size/2, i, window_size=window_size, **kwargs) for i in range(int(window_size))], mode='same')
 
+    print("Convolved")
+
+    return convolved
 
 def stamps_histogram(timestamps: np.ndarray, order=1):
     """
