@@ -6,15 +6,16 @@ import numpy as np
 import pandas as pd
 
 import analysis.analyzer as analyzer
-import positions.positions as positions
-import spikes.reader as reader
+import positions.positions2 as positions
+import spikes.t_reader
+import spikes.t_reader as reader
 import utils.utils as utils
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
 
-    plot = {"position matrix": False,
-            "rotational velocities": False,
+    plot = {"position matrix": True,
+            "rotational velocities": True,
             "rotation distribution": True,
             "binned rotational velocities": False,
             "mutual information totals": True,
@@ -25,7 +26,7 @@ if __name__ == '__main__':
 
     # Import position matrix
     position_matrix = positions.PositionMatrix('../data/HSpos_080602_ps17_160704.mat', start=1)
-    position_matrix.data = position_matrix.data[:, :3]  # Only take time, x, and y
+    position_matrix.data = position_matrix.data[45000:47000, :3]  # Only take time, x, and y
 
     if plot["position matrix"]:
         # Plot position matrix
@@ -48,7 +49,7 @@ if __name__ == '__main__':
         plt.show()
 
     # Compute binned rotational velocities with 9 bins
-    rv_bins = 9
+    rv_bins = 21
     binned_rotational_velocities = analyzer.digitize_timeseries(rotational_velocities_seconds['value'],
                                                                 rv_bins)
 
@@ -64,13 +65,18 @@ if __name__ == '__main__':
         plt.hist(binned_rotational_velocities)
         plt.show()
         plt.title("Histogram of Unbinned Rotational Velocities")
-        plt.hist(rotational_velocities_seconds['value'])
+        plt.hist(rotational_velocities_seconds['value'], bins=21)
         plt.show()
+        plt.title("Histogram of Unbinned Angles")
+        plt.hist(position_matrix.angular_velocities, bins=101)
+        plt.show()
+
+    exit()
 
     # Select and read all T files
     t_files = glob.glob('../data/t_files/*.t')
     read_t_files = reader.read_t_files(t_files)
-    decompressed_t_files = [analyzer.decompress_timestamp_data(read_t_files[i][1], 0) for i in range(len(read_t_files))]
+    decompressed_t_files = [spikes.reader.decompress_timestamp_data(read_t_files[i][1], 0) for i in range(len(read_t_files))]
 
     # Initialize mutual information
     all_val_mutual_infos = []

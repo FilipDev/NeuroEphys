@@ -4,15 +4,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import analysis.analyzer as analyzer
-import spikes.reader as reader
+import spikes.t_reader
+import spikes.t_reader as reader
 import plot.plotter as plotter
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
 
     plot = {
+            "single cell": True,
             "cell vs cell": True,
-            "single cell": False
             }
     debug = True
 
@@ -24,9 +25,9 @@ if __name__ == '__main__':
 
     # Decompress and smooth
     print("Decompressing and smoothing")
-    decompressed_t_files = [analyzer.decompress_timestamp_data(read_t_files[i][1], significant_digits) for i in range(len(read_t_files))]
+    decompressed_t_files = [spikes.reader.decompress_timestamp_data(read_t_files[i][1], significant_digits) for i in range(len(read_t_files))]
     smoothed_t_files = [analyzer.apply_kernel(
-        decompressed_t_files[i], 10**significant_digits, window_size=5000, step_size=10,
+        decompressed_t_files[i], 10**significant_digits, window_size=5000,
         kernel_type="gaussian", sigma=5000
     ) for i in range(len(decompressed_t_files))]
     print("Done")

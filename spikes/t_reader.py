@@ -1,10 +1,12 @@
+import glob
 import random
 from pathlib import Path
 import os
 import numpy as np
 
-
 # TODO: Convert to object oriented Spikes class
+from analysis import analyzer
+
 
 def read_t_files(t_files) -> list:
     """
@@ -19,7 +21,7 @@ def read_t_files(t_files) -> list:
     """
 
     all_processed_timestamps = []
-    for T_file in t_files:
+    for i, T_file in enumerate(t_files):
         # Split the T_file
         directory, base_name = os.path.split(T_file)
         file_extension = Path(base_name).suffix
@@ -70,9 +72,24 @@ def read_t_files(t_files) -> list:
         all_processed_timestamps.append((sample_rate, processed_timestamps))
 
         # Print the first 10 timestamp strings
-        print(f"T File: {T_file} was read: {processed_timestamps[:10]} with sample rate of {sample_rate}Hz")
+        print(f"T File: {T_file} of index {i} was read: {processed_timestamps[:10]} with sample rate of"
+              f" {sample_rate}Hz")
 
     return all_processed_timestamps
+
+
+def read_t_files_decompressed(file_glob, precision=0):
+    """
+    Reads a collection of T-files and returns the number of spikes in each seconds for each T-file.
+    :param file_glob:
+    :param precision:
+    :return:
+    """
+    t_files = glob.glob(file_glob)
+    print(t_files[0])
+    read = read_t_files(t_files)
+    return [decompress_timestamp_data(read[i][1], precision=precision) for i in
+            range(len(read))]
 
 
 def generate_sample_timestamp_data(n_timestamps: int, min_max_difference: tuple, precision: int):
@@ -92,3 +109,24 @@ def generate_sample_timestamp_data(n_timestamps: int, min_max_difference: tuple,
         last_element = timestamps[n - 1] if len(timestamps) > 0 else 0
         timestamps[n] = round(last_element + random.uniform(min_max_difference[0], min_max_difference[1]), precision)
     return timestamps
+
+
+def decompress_timestamp_data(timestamps: np.ndarray, precision: int):
+    """
+    Decompresses timestamp data into a timeseries binary array, while aggregating based on precision if necessary
+    :param timestamps: An array of the timestamps
+    :param precision: The number of significant digits to include
+    :return: The decompressed values as a binary array
+
+    >>> decompress_timestamp_data([4.402, 5.591, 7.063, 9.18, 12.024, 16.364, 21.146, 23.243, 24.675, 29.257], 0)
+    array([0., 0., 0., 0., 1., 0., 1., 1., 0., 1., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 1., 0., 1., 0., 0., 0., 1.])
+    """
+    decompressed_range = int(round(timestamps[-1], precision) * 10 ** precision) + 1
+
+    binary_data = np.zeros(decompressed_range)
+
+    for timestamp in timestamps:
+        timestamp = int(round(timestamp, precision) * 10 ** precision)
+        binary_data[timestamp] = binary_data[timestamp] + 1
+
+    return binary_data

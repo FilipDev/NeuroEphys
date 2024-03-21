@@ -1,42 +1,21 @@
 import numpy as np
 import math
-import scipy.signal as signal
 
-from numpy import ndarray
+import pandas as pd
+import scipy.signal as signal
+import matplotlib.pyplot as plt
 
 from analysis import kernels
 
 
-def decompress_timestamp_data(timestamps: np.ndarray, precision: int):
-    """
-    Decompresses timestamp data into a timeseries binary array, while aggregating based on precision if necessary
-    :param timestamps: An array of the timestamps
-    :param precision: The number of significant digits to include
-    :return: The decompressed values as a binary array
-
-    >>> decompress_timestamp_data([4.402, 5.591, 7.063, 9.18, 12.024, 16.364, 21.146, 23.243, 24.675, 29.257], 0)
-    array([0., 0., 0., 0., 1., 0., 1., 1., 0., 1., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 1., 0., 1., 0., 0., 0., 1.])
-    """
-    decompressed_range = int(round(timestamps[-1], precision) * 10 ** precision) + 1
-
-    binary_data = np.zeros(decompressed_range)
-
-    for timestamp in timestamps:
-        timestamp = int(round(timestamp, precision) * 10 ** precision)
-        binary_data[timestamp] = binary_data[timestamp] + 1
-
-    return binary_data
-
-
-def apply_kernel(binary_data: np.ndarray, steps_per_second: float, window_size: float, step_size: float,
+def apply_kernel(binary_data: np.ndarray, steps_per_second: float, window_size: float,
                  fft=True, **kwargs):
     """
     Applies a kernel on the inputted binary data, used for density calculations
     :param binary_data: The binary input data to apply the kernel on
-    :param window_size: The size of the window in seconds, determines what is included in the kernel
-    :param step_size: The step size in seconds for indexing the input data
     :param steps_per_second: The conversion rate from window_size and step_size units (which are in seconds) to index differences for indexing the input data
-    
+    :param window_size: The size of the window in seconds, determines what is included in the kernel
+
     >>> apply_kernel([0.943, 1.826, 2.56], 10, 1, 0.1, kernel_type='simple')
     [0. 0. 0. 0. 0. 0. 0. 0. 0. 1. 0. 0. 0. 0. 0. 0. 0. 0. 1. 0. 0. 0. 0. 0. 0. 0. 1.]
     """
@@ -48,16 +27,21 @@ def apply_kernel(binary_data: np.ndarray, steps_per_second: float, window_size: 
     window_size_in_seconds = window_size
     window_size *= steps_per_second
 
-    # Makes the step size proportional to the precision of the data in significant digits
-    step_size *= steps_per_second
-
-    convolved = signal.fftconvolve(binary_data, [kernel(window_size/2, i, window_size=window_size, **kwargs) for i in range(int(window_size))], mode='same')
-
-    #convolved = np.convolve(binary_data, [kernel(window_size/2, i, window_size=window_size, **kwargs) for i in range(int(window_size))], mode='same')
+    if fft:
+        convolved = signal.fftconvolve(binary_data, [kernel(window_size/2, i, window_size=window_size, **kwargs) for i in range(int(window_size))], mode='same')
+    else:
+        convolved = np.convolve(binary_data, [kernel(window_size/2, i, window_size=window_size, **kwargs) for i in range(int(window_size))], mode='same')
 
     print("Convolved")
 
     return convolved
+
+
+def group_by_time_units(times, values):
+    data_df = pd.DataFrame({'time': times, 'value': values})
+    data_df_grouped_by_time = data_df.groupby('time')
+    return np.array(data_df_grouped_by_time['value'].mean().reset_index()['value'])
+
 
 def stamps_histogram(timestamps: np.ndarray, order=1):
     """
@@ -101,13 +85,35 @@ def digitize_timeseries(timeseries: np.ndarray, n_bins: int):
     :param n_bins: The number of bins
     :return: The digitized timeseries
     """
-    bins = np.linspace(np.floor(np.min(timeseries)), np.ceil(np.max(timeseries)), num=n_bins+3)
-    # TODO: For some reason, the n_bins is really weird
+    min_value = np.min(timeseries)
+    timeseries = timeseries + min_value
+    bins = np.linspace(np.floor(timeseries), np.ceil(np.max(timeseries)),
+                       num=n_bins + 3)  # n_bins+1 for bin edges
+    for i in range(len(bins)):
+        print(f"bin {i}: {bins[i]}")
+
+    print("bins", bins)
+    plt.hist(timeseries)
+    plt.show()
+    binned = [np.round((timeseries[i]) / (len(bins) + 1)) for i in range(len(timeseries))]
+    binned_hist = [np.count_nonzero(timeseries[(timeseries > bins[i]) & (timeseries < bins[i + 1])]) for i in range(n_bins + 1)]
+    #print("test",  binned)
+    return binned
+    epsilon = 0.5
+    min_val = np.min(timeseries) - epsilon
+    max_val = np.max(timeseries) + epsilon
+    bins = np.linspace(min_val, max_val, num=n_bins + 3)
     v = np.digitize(timeseries, bins)
     v = v - np.median(np.unique(v))
-    v = (np.abs(v) - 1) * np.sign(v)
-    return v
+    #v[np.abs(v) > 6] = 0
+    #v[v < -4] = 0
+    #[print(x) for x in v]
+    plt.hist(v)
+    plt.show()
 
+    v = (np.abs(v) - 1) * np.sign(v)
+
+    return v
 def find_average_value_of_x_when_y(X: np.ndarray, Y: np.ndarray, x, y) -> float:
     """
     Finds the average value of x in X when y is present in Y
@@ -197,10 +203,10 @@ def all_values_mutual_information(X: np.ndarray, Y: np.ndarray) -> dict:
     unique_x, unique_y = np.unique(X), np.unique(Y)
     value_mutual_informations = {}
 
-    for x in unique_x:
+    for x in unique_x[~np.isnan(unique_x)]:
         x = int(x)
         value_mutual_informations[x] = {}
-        for y in unique_y:
+        for y in unique_y[~np.isnan(unique_y)]:
             value_mutual_informations[x][y] = value_mutual_information(X, Y, x, y)
 
     return value_mutual_informations
@@ -218,8 +224,10 @@ def find_probability(X: np.ndarray, x) -> float:
         return 0
     if x is None:
         return 0
+    if np.isnan(x):
+        return 0
 
-    return np.sum(X == x) / len(X)
+    return np.sum((X == x)) / len(X)
 
 
 def find_mutual_probability(X: np.ndarray, Y: np.ndarray, x, y) -> float:
@@ -238,6 +246,8 @@ def find_mutual_probability(X: np.ndarray, Y: np.ndarray, x, y) -> float:
     if len(X) == 0 or len(Y) == 0:
         return 0
     if x is None or y is None:
+        return 0
+    if np.isnan(x):
         return 0
 
     mutual_instances = np.sum((X == x) & (Y == y))
